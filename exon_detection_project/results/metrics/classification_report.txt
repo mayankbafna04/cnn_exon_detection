@@ -1,0 +1,20 @@
+0.0:
+  precision: 0.8996
+  recall: 0.9971
+  f1-score: 0.9458
+  support: 402927.0000
+1.0:
+  precision: 0.9614
+  recall: 0.3946
+  f1-score: 0.5595
+  support: 74073.0000
+macro avg:
+  precision: 0.9305
+  recall: 0.6958
+  f1-score: 0.7527
+  support: 477000.0000
+weighted avg:
+  precision: 0.9092
+  recall: 0.9035
+  f1-score: 0.8858
+  support: 477000.0000
