@@ -25,8 +25,8 @@ class CNNModel:
         self.model = self._build_model()
 
     def _build_model(self):
-        l2 = regularizers.l2(hp['l2_reg'])
         hp = self.hyperparameters
+        l2 = regularizers.l2(hp['l2_reg'])
         model = models.Sequential([
         layers.Input(shape=self.input_shape),
         # First conv block
