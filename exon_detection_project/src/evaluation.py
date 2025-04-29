@@ -23,49 +23,18 @@ class ModelEvaluator:
         for directory in [self.figures_dir, self.metrics_dir]:
             os.makedirs(directory, exist_ok=True)
     
-    def evaluate_model(self, model, X_test, y_test):
-        """
-        Evaluate a model on test data.
-        
-        Parameters:
-        -----------
-        model : CNNModel
-            Trained model to evaluate
-        X_test : np.ndarray
-            Test input data
-        y_test : np.ndarray
-            Test labels
-        
-        Returns:
-        --------
-        dict
-            Dictionary of evaluation metrics
-        """
-        # Get model predictions
+    def evaluate_model(self, model, X_test, y_test, threshold=0.3):
         y_pred_prob = model.predict(X_test)
-        
-        # Flatten for binary classification metrics
         y_test_flat = y_test.flatten()
         y_pred_prob_flat = y_pred_prob.flatten()
-        
-        # Classification threshold
-        threshold = 0.5
         y_pred_flat = (y_pred_prob_flat >= threshold).astype(int)
-        
-        # Calculate ROC and PR curves
+        from sklearn.metrics import roc_curve, precision_recall_curve, auc, confusion_matrix, classification_report
         fpr, tpr, _ = roc_curve(y_test_flat, y_pred_prob_flat)
         roc_auc = auc(fpr, tpr)
-        
         precision, recall, _ = precision_recall_curve(y_test_flat, y_pred_prob_flat)
         pr_auc = auc(recall, precision)
-        
-        # Calculate confusion matrix
         cm = confusion_matrix(y_test_flat, y_pred_flat)
-        
-        # Calculate classification report
         report = classification_report(y_test_flat, y_pred_flat, output_dict=True)
-        
-        # Store metrics
         metrics = {
             'roc_auc': roc_auc,
             'pr_auc': pr_auc,
@@ -76,7 +45,6 @@ class ModelEvaluator:
             'precision': precision,
             'recall': recall
         }
-        
         return metrics
     
     def plot_roc_curve(self, metrics, save=True):

@@ -1,158 +1,94 @@
 # src/cnn_model.py
+
 import tensorflow as tf
-from tensorflow.keras import layers, models, optimizers
-from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
+from tensorflow.keras import layers, models, optimizers, regularizers
+from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
 
 class CNNModel:
     def __init__(self, input_shape, hyperparameters=None):
-        """
-        Initialize the CNN model for exon detection.
-        
-        Parameters:
-        -----------
-        input_shape : tuple
-            Shape of input data (window_size, 4)
-        hyperparameters : dict, optional
-            Dictionary containing hyperparameters
-        """
         self.input_shape = input_shape
-        
-        # Default hyperparameters
         self.hyperparameters = {
             'filters1': 64,
             'filters2': 128,
+            'filters3': 256,
             'kernel_size1': 7,
             'kernel_size2': 5,
+            'kernel_size3': 3,
             'pool_size': 2,
             'dropout_rate': 0.25,
             'dense_units': 128,
-            'learning_rate': 0.001
+            'learning_rate': 0.001,
+            'l2_reg': 1e-6
         }
-        
-        # Update with custom hyperparameters if provided
         if hyperparameters:
             self.hyperparameters.update(hyperparameters)
-        
-        # Build the model
         self.model = self._build_model()
-    
+
     def _build_model(self):
-        """Build and compile the CNN model"""
+        l2 = regularizers.l2(hp['l2_reg'])
+        hp = self.hyperparameters
         model = models.Sequential([
-            # Input layer
-            layers.Input(shape=self.input_shape),
-            
-            # First convolutional block
-            layers.Conv1D(
-                filters=self.hyperparameters['filters1'],
-                kernel_size=self.hyperparameters['kernel_size1'],
-                activation='relu',
-                padding='same'
-            ),
-            layers.BatchNormalization(),
-            layers.MaxPooling1D(pool_size=self.hyperparameters['pool_size']),
-            layers.Dropout(self.hyperparameters['dropout_rate']),
-            
-            # Second convolutional block
-            layers.Conv1D(
-                filters=self.hyperparameters['filters2'],
-                kernel_size=self.hyperparameters['kernel_size2'],
-                activation='relu',
-                padding='same'
-            ),
-            layers.BatchNormalization(),
-            layers.MaxPooling1D(pool_size=self.hyperparameters['pool_size']),
-            layers.Dropout(self.hyperparameters['dropout_rate']),
-            
-            # Dense layer
+        layers.Input(shape=self.input_shape),
+        # First conv block
+        layers.Conv1D(hp['filters1'], hp['kernel_size1'], activation='relu', padding='same'),
+        layers.MaxPooling1D(pool_size=hp['pool_size']),
+        layers.Dropout(hp['dropout_rate']),
+        
+        # Second conv block
+        layers.Conv1D(hp['filters2'], hp['kernel_size2'], activation='relu', padding='same'),
+        layers.MaxPooling1D(pool_size=hp['pool_size']),
+        layers.Dropout(hp['dropout_rate']),
+        
+        # Third conv block (added)
+        layers.Conv1D(hp['filters3'], hp['kernel_size3'], activation='relu', padding='same'),
+        layers.MaxPooling1D(pool_size=hp['pool_size']),
+        layers.Dropout(hp['dropout_rate']),
+        
+            # Dense
             layers.Flatten(),
-            layers.Dense(self.hyperparameters['dense_units'], activation='relu'),
+            layers.Dense(hp['dense_units'], activation='relu', kernel_regularizer=l2),
             layers.BatchNormalization(),
-            layers.Dropout(self.hyperparameters['dropout_rate']),
-            
-            # Output layer - reshape to match the window size
+            layers.Dropout(hp['dropout_rate']),
             layers.Dense(self.input_shape[0], activation='sigmoid')
         ])
-        
-        # Compile the model
-        optimizer = optimizers.Adam(learning_rate=self.hyperparameters['learning_rate'])
+        lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+            initial_learning_rate=hp['learning_rate'],
+            decay_steps=10000, decay_rate=0.96)
+        optimizer = optimizers.Adam(learning_rate=lr_schedule)
         model.compile(
             optimizer=optimizer,
             loss='binary_crossentropy',
             metrics=['accuracy', tf.keras.metrics.AUC(), tf.keras.metrics.Precision(), tf.keras.metrics.Recall()]
         )
-        
         return model
-    
-    def train(self, X_train, y_train, X_val=None, y_val=None, batch_size=32, epochs=50, model_path=None):
-        """
-        Train the CNN model.
-        
-        Parameters:
-        -----------
-        X_train : np.ndarray
-            Training input data
-        y_train : np.ndarray
-            Training labels
-        X_val : np.ndarray, optional
-            Validation input data
-        y_val : np.ndarray, optional
-            Validation labels
-        batch_size : int
-            Batch size for training
-        epochs : int
-            Number of training epochs
-        model_path : str, optional
-            Path to save the best model
-            
-        Returns:
-        --------
-        history : tf.keras.callbacks.History
-            Training history
-        """
-        callbacks = []
-        
-        # Add early stopping
-        callbacks.append(EarlyStopping(
-            monitor='val_loss' if X_val is not None else 'loss',
-            patience=10,
-            restore_best_weights=True
-        ))
-        
-        # Add model checkpoint if path is provided
+
+    def train(self, X_train, y_train, X_val=None, y_val=None, batch_size=32, epochs=50, model_path=None, class_weight=None):
+        callbacks = [
+            EarlyStopping(monitor='val_loss' if X_val is not None else 'loss', patience=10, restore_best_weights=True),
+            ReduceLROnPlateau(monitor='val_loss' if X_val is not None else 'loss', factor=0.5, patience=5, min_lr=1e-6)
+        ]
         if model_path:
-            callbacks.append(ModelCheckpoint(
-                filepath=model_path,
-                monitor='val_loss' if X_val is not None else 'loss',
-                save_best_only=True
-            ))
-        
-        # Train the model
+            callbacks.append(ModelCheckpoint(filepath=model_path, monitor='val_loss' if X_val is not None else 'loss', save_best_only=True))
         validation_data = (X_val, y_val) if X_val is not None and y_val is not None else None
-        
         history = self.model.fit(
             X_train, y_train,
             batch_size=batch_size,
             epochs=epochs,
             validation_data=validation_data,
             callbacks=callbacks,
-            verbose=1
+            verbose=1,
+            class_weight=class_weight
         )
-        
         return history
-    
+
     def predict(self, X):
-        """Make predictions with the model"""
         return self.model.predict(X)
-    
+
     def evaluate(self, X_test, y_test):
-        """Evaluate the model on test data"""
         return self.model.evaluate(X_test, y_test)
-    
+
     def save(self, path):
-        """Save the model to disk"""
         self.model.save(path)
-    
+
     def load(self, path):
-        """Load the model from disk"""
         self.model = models.load_model(path)

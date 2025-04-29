@@ -28,63 +28,34 @@ class Particle:
         self.current_score = float('inf')
 
 class PSOOptimizer:
-    def __init__(self, n_particles=10, dimensions=7, bounds=None, w=0.7, c1=1.5, c2=1.5, max_iter=15):
-        """
-        Initialize the PSO optimizer.
-        
-        Parameters:
-        -----------
-        n_particles : int
-            Number of particles in the swarm
-        dimensions : int
-            Number of dimensions to optimize
-        bounds : list of tuples
-            Bounds for each dimension (min, max)
-        w : float
-            Inertia weight
-        c1 : float
-            Cognitive coefficient
-        c2 : float
-            Social coefficient
-        max_iter : int
-            Maximum number of iterations
-        """
+    def __init__(self, n_particles=10, dimensions=9, bounds=None, w=0.7, c1=1.5, c2=1.5, max_iter=15):
         self.n_particles = n_particles
         self.dimensions = dimensions
         self.bounds = bounds if bounds else self._set_default_bounds()
-        self.w = w  # Inertia weight
-        self.c1 = c1  # Cognitive coefficient
-        self.c2 = c2  # Social coefficient
+        self.w = w
+        self.c1 = c1
+        self.c2 = c2
         self.max_iter = max_iter
-        
-        # Initialize particles
         self.particles = [Particle(dimensions, self.bounds) for _ in range(n_particles)]
-        
-        # Initialize global best
         self.global_best_position = None
-        self.global_best_score = float('inf')  # For minimization problem
-        
-        # Hyperparameter names for mapping
+        self.global_best_score = float('inf')
         self.param_names = [
-            'filters1',
-            'filters2',
-            'kernel_size1',
-            'kernel_size2',
-            'pool_size', 
-            'dropout_rate',
-            'dense_units'
+            'filters1', 'filters2', 'filters3',
+            'kernel_size1', 'kernel_size2', 'kernel_size3',
+            'pool_size', 'dropout_rate', 'dense_units'
         ]
-    
+
     def _set_default_bounds(self):
-        """Set default bounds for CNN hyperparameters"""
         return [
-            (32, 128),      # filters1
-            (64, 256),      # filters2
-            (3, 11),        # kernel_size1
-            (3, 9),         # kernel_size2
-            (2, 4),         # pool_size
-            (0.1, 0.5),     # dropout_rate
-            (64, 256)       # dense_units
+            (32, 128),   # filters1
+            (64, 256),   # filters2
+            (128, 384),  # filters3
+            (3, 11),     # kernel_size1
+            (3, 9),      # kernel_size2
+            (3, 7),      # kernel_size3
+            (2, 4),      # pool_size
+            (0.1, 0.5),  # dropout_rate
+            (64, 256)    # dense_units
         ]
     
     def _position_to_hyperparameters(self, position):
