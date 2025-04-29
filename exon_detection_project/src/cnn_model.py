@@ -80,6 +80,35 @@ class CNNModel:
             class_weight=class_weight
         )
         return history
+    
+    def predict_with_threshold(self, X, threshold=0.7, early_stop=True):
+        """
+        Predict with early stopping when high confidence exons are found.
+        
+        Parameters:
+        -----------
+        X : np.ndarray
+            Input data
+        threshold : float
+            Confidence threshold
+        early_stop : bool
+            Whether to stop processing once a high confidence exon is found
+            
+        Returns:
+        --------
+        np.ndarray
+            Predictions
+        """
+        predictions = self.model.predict(X)
+        
+        if early_stop:
+            # For each sequence, check if there's a high confidence exon
+            high_conf_mask = np.max(predictions, axis=1) > threshold
+            
+            # For sequences with high confidence predictions, we can 
+            # avoid further processing in downstream tasks
+            return predictions, high_conf_mask
+        return predictions
 
     def predict(self, X):
         return self.model.predict(X)

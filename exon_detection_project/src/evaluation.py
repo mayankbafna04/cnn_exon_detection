@@ -203,3 +203,63 @@ class ModelEvaluator:
             plt.close()
         else:
             plt.show()
+
+    def visualize_sample_sequence(self, X_test, y_test, y_pred, sample_idx=0, save=True):
+        """
+        Visualize a single sample sequence with its prediction.
+        
+        Parameters:
+        -----------
+        X_test : np.ndarray
+            Test input data
+        y_test : np.ndarray
+            True labels
+        y_pred : np.ndarray
+            Predicted probabilities
+        sample_idx : int
+            Index of the sample to visualize
+        save : bool
+            Whether to save the plot
+        """
+        fig, axes = plt.subplots(3, 1, figsize=(15, 12))
+        
+        # Get the sample
+        sample = X_test[sample_idx]
+        true_labels = y_test[sample_idx]
+        pred_probs = y_pred[sample_idx]
+        
+        # Plot DNA sequence (convert one-hot back to nucleotides)
+        nucleotides = np.argmax(sample, axis=1)
+        nuc_map = {0: 'A', 1: 'C', 2: 'G', 3: 'T'}
+        seq = ''.join([nuc_map[n] for n in nucleotides])
+        
+        # Plot exon predictions
+        axes[0].plot(true_labels, 'g-', linewidth=2, label='True Exons')
+        axes[0].set_title(f'Exon Positions for Sample {sample_idx}')
+        axes[0].set_ylim(-0.1, 1.1)
+        axes[0].set_ylabel('Is Exon')
+        axes[0].legend()
+        
+        # Plot predicted probabilities
+        axes[1].plot(pred_probs, 'b-', linewidth=2, label='Predicted Probabilities')
+        axes[1].set_title(f'Predicted Exon Probabilities')
+        axes[1].set_ylim(-0.1, 1.1)
+        axes[1].set_ylabel('Probability')
+        axes[1].legend()
+        
+        # Display sequence visualization
+        axes[2].imshow(sample.T, aspect='auto', cmap='viridis')
+        axes[2].set_title('Sequence One-Hot Encoding')
+        axes[2].set_xlabel('Position')
+        axes[2].set_ylabel('Nucleotide (A,C,G,T)')
+        axes[2].set_yticks([0, 1, 2, 3])
+        axes[2].set_yticklabels(['A', 'C', 'G', 'T'])
+        
+        plt.tight_layout()
+        
+        if save:
+            plt.savefig(os.path.join(self.figures_dir, f'sample_{sample_idx}_visualization.png'), 
+                        dpi=300, bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()

@@ -1,4 +1,3 @@
-# src/data_processing.py
 import os
 import random
 import numpy as np
@@ -50,6 +49,20 @@ class DNADataProcessor:
                 time.sleep(1)
             except Exception as e:
                 print(f"Error downloading {acc}: {e}")
+
+    def save_processing_progress(self, processed_accessions):
+        """Save the list of processed accession numbers"""
+        with open(os.path.join(self.processed_dir, "progress.txt"), 'w') as f:
+            for acc in processed_accessions:
+                f.write(f"{acc}\n")
+
+    def load_processing_progress(self):
+        """Load the list of processed accession numbers"""
+        progress_file = os.path.join(self.processed_dir, "progress.txt")
+        if os.path.exists(progress_file):
+            with open(progress_file, 'r') as f:
+                return [line.strip() for line in f.readlines()]
+        return []
     
     def extract_exons(self):
         """Extract exons from GenBank files"""
@@ -111,7 +124,7 @@ class DNADataProcessor:
         return X
 
     def split_train_test(self):
-        """Split data into training and testing sets, and apply SMOTE oversampling"""
+        """Split data into training and testing sets, and apply oversampling"""
         print("Splitting data into train and test sets...")
         try:
             X = np.load(os.path.join(self.processed_dir, "X_data.npy"))
@@ -128,40 +141,40 @@ class DNADataProcessor:
         X_train, X_test = X[:split_idx], X[split_idx:]
         y_train, y_test = y[:split_idx], y[split_idx:]
 
-        # Apply RandomOverSampler at window level first
+        # Apply RandomOverSampler at window level
         print("Applying RandomOverSampler at window level...")
         y_train_win = (y_train.sum(axis=1) > 0).astype(int)
-        
-        # Oversample at WINDOW level
         ros = RandomOverSampler()
-        X_resampled, _ = ros.fit_resample(
-            X_train.reshape(X_train.shape[0], -1), 
-            y_train_win
-        )
-        
-        # Get original indices of oversampled windows
+        X_resampled, _ = ros.fit_resample(X_train.reshape(X_train.shape[0], -1), y_train_win)
         _, idx = np.unique(X_resampled, axis=0, return_index=True)
         X_balanced = X_train[idx]
         y_balanced = y_train[idx]
-        
-        # Combine with original data
         X_train = np.concatenate([X_train, X_balanced])
         y_train = np.concatenate([y_train, y_balanced])
 
-        # Then apply SMOTE oversampling
+        # Then apply SMOTE oversampling (with error handling)
         print("Applying SMOTE oversampling to training set...")
-        y_train_win = (y_train.sum(axis=1) > 0).astype(int)
-        X_train_flat = X_train.reshape((X_train.shape[0], -1))
-        smote = SMOTE()
-        X_train_bal, y_train_win_bal = smote.fit_resample(X_train_flat, y_train_win)
+        try:
+            y_train_win = (y_train.sum(axis=1) > 0).astype(int)
+            X_train_flat = X_train.reshape((X_train.shape[0], -1))
+            
+            if np.sum(y_train_win == 1) >= 5 and np.sum(y_train_win == 0) >= 5:
+                smote = SMOTE()
+                X_train_bal, y_train_win_bal = smote.fit_resample(X_train_flat, y_train_win)
 
-        mask = y_train_win_bal == 1
-        X_train_exon = X_train_bal[mask].reshape((-1, X_train.shape[1], X_train.shape[2]))
-        y_train_exon = np.tile(np.ones((1, y_train.shape[1])), (X_train_exon.shape[0], 1))
+                mask = y_train_win_bal == 1
+                X_train_exon = X_train_bal[mask].reshape((-1, X_train.shape[1], X_train.shape[2]))
+                y_train_exon = np.tile(np.ones((1, y_train.shape[1])), (X_train_exon.shape[0], 1))
 
-        X_train = np.concatenate([X_train, X_train_exon], axis=0)
-        y_train = np.concatenate([y_train, y_train_exon], axis=0)
+                X_train = np.concatenate([X_train, X_train_exon], axis=0)
+                y_train = np.concatenate([y_train, y_train_exon], axis=0)
+            else:
+                print("Warning: Not enough samples for SMOTE. Using original dataset.")
+        except Exception as e:
+            print(f"Error during SMOTE: {e}")
+            print("Continuing with original dataset.")
 
+        # Save data
         np.save(os.path.join(self.train_dir, "X_train.npy"), X_train)
         np.save(os.path.join(self.train_dir, "y_train.npy"), y_train)
         np.save(os.path.join(self.test_dir, "X_test.npy"), X_test)

@@ -8,6 +8,7 @@ from .cnn_model import CNNModel
 
 class Particle:
     def __init__(self, dimensions, bounds):
+
         """
         Initialize a particle for PSO.
         
@@ -37,7 +38,7 @@ class PSOOptimizer:
         self.c2 = c2
         self.max_iter = max_iter
         self.particles = [Particle(dimensions, self.bounds) for _ in range(n_particles)]
-        self.global_best_position = None
+        self.global_best_position = np.copy(self.particles[0].position)
         self.global_best_score = float('inf')
         self.param_names = [
             'filters1', 'filters2', 'filters3',
